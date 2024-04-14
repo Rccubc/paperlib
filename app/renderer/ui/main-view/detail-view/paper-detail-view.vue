@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { onUpdated, ref } from "vue";
+import path from "path";
+import { onUpdated, provide, ref } from "vue";
 
+import { disposable } from "@/base/dispose";
 import { Categorizer, CategorizerType } from "@/models/categorizer";
 import { PaperEntity } from "@/models/paper-entity";
 
-import { disposable } from "@/base/dispose";
 import Authors from "./components/authors.vue";
 import Categorizers from "./components/categorizers.vue";
-import OnlineResources from "./components/online-resources.vue";
 import Markdown from "./components/markdown.vue";
+import OnlineResources from "./components/online-resources.vue";
 import PubDetails from "./components/pub-details.vue";
 import Rating from "./components/rating.vue";
 import Section from "./components/section.vue";
@@ -42,6 +43,8 @@ const props = defineProps({
 // State
 // ======================
 const uiState = uiStateService.useState();
+const editingURL = ref("");
+provide("editingURL", editingURL);
 
 // ==============================
 // Event Handler
@@ -102,11 +105,94 @@ const onDeleteSup = (url: string) => {
   paperService.deleteSup(paperEntityDraft, url);
 };
 
+// TODO sup
+// 1. valid editingURL and customName
+// 2. using customName gemerate targetURL
+// 3. call paperService update URL
+// 4. remove editingURL
+const onEditSupSubmit = (customName: string) => {
+  if (
+    !editingURL ||
+    !customName ||
+    customName.startsWith("sup") ||
+    customName.startsWith("SUP") ||
+    /[\\/:*?"<>|\x00-\x1F\x7F]/.test(customName) // invalid file path char
+  ) {
+    logService.info(
+      "onEditSupSubmit(): On 'event:submit-name-editing', because editingURL is false or customName not valid, editing over. Should show msg to tell user. ",
+      `customName=${customName}, editingURL=${editingURL}`,
+      false,
+      "PaperDetailView"
+    );
+    //TODO: should add some alert to tell user the input is not valid
+
+    editingURL.value = "";
+    return;
+  }
+
+  const sourceURL = editingURL.value;
+  let extPart = path.extname(sourceURL);
+  const basePart = sourceURL.slice(0, sourceURL.lastIndexOf("sup"));
+  let namePart: string;
+  let targetURL: string;
+  if (extPart !== "") {
+    namePart = sourceURL.slice(
+      sourceURL.lastIndexOf("sup"),
+      sourceURL.lastIndexOf(extPart)
+    );
+  } else {
+    namePart = sourceURL.slice(sourceURL.lastIndexOf("sup"));
+  }
+  namePart = /^sup\d+$/.test(namePart)
+    ? `${namePart}_${customName}`
+    : `${namePart.split("_")[0]}_${customName}`;
+  targetURL = `${basePart}${namePart}${extPart}`;
+
+  logService.info(
+    "onEditSupSubmit(): On 'event:submit-name-editing', call paperService::editSup()",
+    `customName=${customName}, sourceURL=${sourceURL}, targetURL=${targetURL}`,
+    false,
+    "PaperDetailView"
+  );
+  const paperEntityDraft = new PaperEntity(props.entity);
+  paperService.editSup(paperEntityDraft, sourceURL, targetURL);
+
+  editingURL.value = "";
+};
+
+// TODO sup
+const onEditSupClicked = (url: string) => {
+  logService.info(
+    "onEditSupClicked(): change the editingURL signal to clicked supURL",
+    `url = ${url}`,
+    false,
+    "PaperDetailView"
+  );
+  editingURL.value = url;
+};
+
 disposable(
   PLMainAPI.contextMenuService.on(
     "supContextMenuDeleteClicked",
     (newValue: { value: string }) => {
       onDeleteSup(newValue.value);
+    }
+  )
+);
+
+// TODO sup: 更改 PaperDetailView 的 editingURL
+disposable(
+  PLMainAPI.contextMenuService.on(
+    "supContextMenuEditClicked",
+    (newValue: { value: string }) => {
+      logService.info(
+        "On event 'supContextMenuEditClicked': call PaperDetailView::onEditClicked()",
+        `newValue.value=${newValue.value}`,
+        false,
+        "ContextMenuService"
+      );
+
+      onEditSupClicked(newValue.value);
     }
   )
 );
@@ -234,8 +320,7 @@ onUpdated(() => {
         v-for="[id, item] of Object.entries(slot1)"
         :title="item.title"
       >
-        <div class="text-xxs" v-html="item.content">
-        </div>
+        <div class="text-xxs" v-html="item.content"></div>
       </Section>
 
       <Section
@@ -280,8 +365,7 @@ onUpdated(() => {
         v-for="[id, item] of Object.entries(slot2)"
         :title="item.title"
       >
-        <div class="text-xxs" v-html="item.content">
-        </div>
+        <div class="text-xxs" v-html="item.content"></div>
       </Section>
 
       <Section :title="$t('mainview.preview')">
@@ -317,10 +401,17 @@ onUpdated(() => {
         />
       </Section>
       <Section
-        :title="$t('mainview.supplementaries')"
         v-if="entity.supURLs.length > 0"
+        :title="$t('mainview.supplementaries')"
       >
-        <Supplementary :sups="entity.supURLs" />
+        <Supplementary
+          :sups="entity.supURLs"
+          @event:submit-name-editing="
+            (customName: string) => {
+              onEditSupSubmit(customName);
+            }
+          "
+        />
       </Section>
       <Markdown :title="'Markdown'" :sups="entity.supURLs" />
 
@@ -329,8 +420,7 @@ onUpdated(() => {
         v-for="[id, item] of Object.entries(slot3)"
         :title="item.title"
       >
-        <div class="text-xxs" v-html="item.content">
-        </div>
+        <div class="text-xxs" v-html="item.content"></div>
       </Section>
     </div>
 

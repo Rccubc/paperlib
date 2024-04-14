@@ -81,6 +81,7 @@ export interface IContextMenuServiceState {
   sidebarContextMenuColorClicked: { data: string; type: string; color: string };
   sidebarContextMenuDeleteClicked: { data: string; type: string };
   supContextMenuDeleteClicked: string;
+  supContextMenuEditClicked: string;
   thumbnailContextMenuReplaceClicked: number;
   thumbnailContextMenuRefreshClicked: number;
   linkToFolderClicked: string;
@@ -127,6 +128,7 @@ export class ContextMenuService extends Eventable<IContextMenuServiceState> {
       sidebarContextMenuColorClicked: { data: "", type: "", color: "" },
       sidebarContextMenuDeleteClicked: { data: "", type: "" },
       supContextMenuDeleteClicked: "",
+      supContextMenuEditClicked: "",
       thumbnailContextMenuReplaceClicked: 0,
       thumbnailContextMenuRefreshClicked: 0,
       linkToFolderClicked: "",
@@ -546,6 +548,19 @@ export class ContextMenuService extends Eventable<IContextMenuServiceState> {
         label: this._locales.t("menu.delete"),
         click: () => {
           this.fire({ supContextMenuDeleteClicked: fileURL });
+        },
+      },
+      //TODO sup
+      {
+        label: this._locales.t("menu.edit"),
+        click: () => {
+          PLAPI.logService.info(
+            "showSupMenu(): click the edit button, fire event 'supContextMenuEditClicked'",
+            `fileURL=${fileURL}`,
+            false,
+            "ContextMenuService"
+          );
+          this.fire({ supContextMenuEditClicked: fileURL });
         },
       },
     ];

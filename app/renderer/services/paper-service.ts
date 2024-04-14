@@ -490,6 +490,7 @@ export class PaperService extends Eventable<IPaperServiceState> {
     }
 
     paperEntity.supURLs.push(...urls);
+    // Confuse: why there call fileService.move(), move() will be called in update()?
     paperEntity = await this._fileService.move(paperEntity, false, true);
 
     await this.update([paperEntity], false, true);
@@ -549,6 +550,51 @@ export class PaperService extends Eventable<IPaperServiceState> {
       (supUrl) => !url.endsWith(supUrl)
     );
 
+    await this.update([paperEntity], false, true);
+  }
+
+  /** TODO sup
+   * Rename a suplementary file.
+   * @param paperEntity - The paper entity.
+   * @param customName - The custom name of the supplementary file.
+   */
+  @processing(ProcessingKey.General)
+  @errorcatching("Failed to rename supplementary file.", true, "PaperService")
+  async editSup(
+    paperEntity: PaperEntity,
+    sourceURL: string,
+    targetURL: string
+  ) {
+    this._logService.info(
+      "editSup(): call fileService::moveFile() to rename sup file in file system",
+      `sourceURL=${sourceURL}, targetURL=${targetURL}`,
+      false,
+      "paperService"
+    );
+    const movedSupURL = await this._fileService.moveFile(sourceURL, targetURL);
+    this._logService.info(
+      "editSup(): after call fileService::moveFile()",
+      `moved sup file: ${movedSupURL}`,
+      false,
+      "PaperService"
+    );
+
+    const index = paperEntity.supURLs.indexOf(sourceURL);
+    this._logService.info(
+      "editSup(): before change paperEntity's sups list",
+      `paperEntity.supURLs=${paperEntity.supURLs}, targetURL=${targetURL}`,
+      false,
+      "PaperService"
+    );
+
+    paperEntity.supURLs[index] = movedSupURL;
+
+    this._logService.info(
+      "editSup(): after change paperEntity's sups list",
+      `paperEntity.supURLs=${paperEntity.supURLs}}`,
+      false,
+      "PaperService"
+    );
     await this.update([paperEntity], false, true);
   }
 
@@ -721,9 +767,13 @@ export class PaperService extends Eventable<IPaperServiceState> {
       return new PaperEntity(paperEntity);
     });
 
+    // Confuse: why there call fileService.move(), move() will be called in update()?
     const movedEntityDrafts = await Promise.all(
-      paperEntityDrafts.map((paperEntityDraft: PaperEntity) =>
-        this._fileService.move(paperEntityDraft, false)
+      paperEntityDrafts.map(
+        (paperEntityDraft: PaperEntity) =>
+          // Confuse: why 'moveMain' is false, but 'moveSups' is true
+          this._fileService.move(paperEntityDraft, false)
+        // this._fileService.move(paperEntityDraft, false, false)
       )
     );
 

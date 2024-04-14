@@ -237,14 +237,31 @@ export class FileService extends Eventable<IFileServiceState> {
         );
         paperEntity.mainURL = movedMainFilename;
       }
-
+      // TODO sup
       if (moveSups) {
         const movedSupURLs: string[] = [];
         for (let i = 0; i < paperEntity.supURLs.length; i++) {
-          const movedSupFileName = await backend.moveFile(
-            paperEntity.supURLs[i],
-            `${formatedFilename}_sup${i}${path.extname(paperEntity.supURLs[i])}`
+          const sourceURL = paperEntity.supURLs[i];
+          let targetURL: string;
+          let targetName: string;
+          if (path.isAbsolute(sourceURL)) {
+            // only at add sup(call addSups())
+            targetName = `${path.extname(paperEntity.supURLs[i])}`;
+          } else {
+            // xxx_id_sup#_ABC.pdf -> _ABC.pdf or xxx_id_sup#.pdf -> .pdf
+            // at rename sup: the sourceURL here is alreay the targetURL we want, because we do real file move before update in paperService::editSup()：
+            // at rename main(call renameAll()): can remain customName
+            targetName = sourceURL.split(`sup${i}`).pop() ?? "";
+          }
+          targetURL = `${formatedFilename}_sup${i}${targetName}`;
+          logService.info(
+            "move(): moveSups",
+            `sourceURL=${sourceURL}, targetURL=${targetURL}, targetName=${targetName},\
+            split sourceURL by sup${i} => ${sourceURL.split(`sup${i}`)}`,
+            false,
+            "FileService"
           );
+          const movedSupFileName = await backend.moveFile(sourceURL, targetURL);
           movedSupURLs.push(movedSupFileName);
         }
         paperEntity.supURLs = movedSupURLs;
